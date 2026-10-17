@@ -7,3 +7,6 @@ node_modules/
 # The call transcripts are for the task only and must never be published.
 *transcript*
 *.zip
+
+# Private handoff notes for Claude
+CLAUDE.local.md
