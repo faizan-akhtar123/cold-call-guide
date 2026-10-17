@@ -10,7 +10,7 @@ The screen a caller keeps open beside the phone on a cold call. It keeps them on
 | Backend health (Render) | `RENDER_URL/health` |
 | Backend base (Render) | `RENDER_URL` |
 
-## LLM: Google Gemini (`gemini-2.5-flash`, free tier)
+## LLM: Google Gemini (`gemini-3.8-flash`, free tier)
 
 Used for one thing: **checking the record when a call is closed.** The backend sends the stage taps, the prospect's words and the outcome the caller logged. Gemini returns:
 

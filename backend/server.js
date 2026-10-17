@@ -6,7 +6,8 @@ const {
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   GEMINI_API_KEY,
-  GEMINI_MODEL = "gemini-2.5-flash",
+  GEMINI_MODEL = "gemini-3.8-flash",
+  GEMINI_FALLBACKS = "gemini-flash-latest,gemini-3.5-flash,gemini-flash-lite-latest",
   ALLOWED_ORIGINS = "",
   PORT = 3000,
 } = process.env;
@@ -202,42 +203,56 @@ Outcome the caller logged: ${outcome}
 
 Tasks:
 1. Write a one-line summary (max 18 words) that the caller will read before the next call. Lead with what the prospect wants or said, not with the caller's pitch. Plain words.
-2. Pick the outcome that the record actually supports, from: ${OUTCOMES.join(", ")}.
-   A yes to receiving a document is agreed_to_receive_report, not interested. next_step_agreed needs a named time, meeting or referral. If nothing concrete was agreed, do not pick next_step_agreed.
+2. Pick the outcome that the record actually supports, using these meanings:
+   agreed_to_receive_report: agreed to receive a document on WhatsApp or email
+   next_step_agreed: a meeting, a call at a set time, or a report plus a follow-up call was agreed
+   interested: said they were interested, without a fixed next step
+   follow_up: the caller is to call again (busy, travelling, asked to call later)
+   call_again: the number is to be called again because of language or line quality
+   not_interested: declined
+   do_not_call: asked not to be called
+   wrong_person: the person reached was not the right person
+   moved_company: the person no longer works at the company
+   A polite yes to a document is agreed_to_receive_report, not interested. "Call me later" with no set time is follow_up, not next_step_agreed.
 3. Give the reason in one short sentence.
 
 Answer only as JSON: {"summary": "...", "suggested_outcome": "...", "reason": "..."}`;
 
-  try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-        }),
-        signal: AbortSignal.timeout(20000),
+  // Free-tier models are sometimes busy (503) or rate limited (429), so try
+  // the configured model first and then the fallbacks.
+  const models = [...new Set([GEMINI_MODEL, ...GEMINI_FALLBACKS.split(",").map((m) => m.trim()).filter(Boolean)])];
+  for (const model of models) {
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+          }),
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+      if (!r.ok) {
+        console.error(`Gemini ${model} error`, r.status, (await r.text()).slice(0, 300));
+        continue;
       }
-    );
-    if (!r.ok) {
-      console.error("Gemini error", r.status, await r.text());
-      return null;
+      const body = await r.json();
+      const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parsed = JSON.parse(text);
+      if (!OUTCOMES.includes(parsed.suggested_outcome)) parsed.suggested_outcome = outcome;
+      return {
+        summary: String(parsed.summary || "").slice(0, 300),
+        suggested_outcome: parsed.suggested_outcome,
+        reason: String(parsed.reason || "").slice(0, 300),
+      };
+    } catch (err) {
+      console.error(`Gemini ${model} call failed`, err.message);
     }
-    const body = await r.json();
-    const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(text);
-    if (!OUTCOMES.includes(parsed.suggested_outcome)) parsed.suggested_outcome = outcome;
-    return {
-      summary: String(parsed.summary || "").slice(0, 300),
-      suggested_outcome: parsed.suggested_outcome,
-      reason: String(parsed.reason || "").slice(0, 300),
-    };
-  } catch (err) {
-    console.error("Gemini call failed", err.message);
-    return null;
   }
+  return null;
 }
 
 app.listen(PORT, () => console.log(`Cold call guide backend on port ${PORT}`));
