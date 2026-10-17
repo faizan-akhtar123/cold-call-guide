@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+.vercel
+# The call transcripts are for the task only and must never be published.
+*transcript*
+*.zip
