@@ -6,7 +6,7 @@ The screen a caller keeps open beside the phone on a cold call. It keeps them on
 
 | What | URL |
 |---|---|
-| The screen (Vercel) | `VERCEL_URL` |
+| The screen (Vercel) | https://cold-call-guide-frontend.vercel.app |
 | Backend health (Render) | https://cold-call-guide.onrender.com/health |
 | Backend base (Render) | https://cold-call-guide.onrender.com |
 
