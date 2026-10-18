@@ -146,6 +146,7 @@ window.STAGES = [
       "Report on WhatsApp",
       "Report on email",
       "Call at a named time",
+      "Meeting with founder (Google Meet)",
       "Referred to a colleague",
       "Nothing agreed",
     ],
